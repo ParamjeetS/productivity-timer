@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Productivity Timer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    };
+  </script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 h-screen overflow-hidden p-4 md:p-6 font-sans transition-colors duration-200">
+  <div class="max-w-4xl mx-auto h-full flex flex-col space-y-4">
+    
+    <!-- Header with Dark Mode Toggle -->
+    <header class="bg-white dark:bg-gray-800 p-4 md:p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex justify-between items-center shrink-0 transition-colors">
+      <div>
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-100">Productivity Timer</h1>
+        <p class="text-xs md:text-sm text-gray-500 dark:text-gray-400">Plan your activities, set custom countdowns, and track your tasks.</p>
+      </div>
+      
+      <button 
+        id="themeToggleBtn" 
+        onclick="toggleDarkMode()" 
+        class="p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 transition text-lg md:text-xl"
+        title="Toggle Theme"
+      >
+        🌙
+      </button>
+    </header>
+
+    <!-- Summary Stats Container -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+      <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors">
+        <p class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider">Total Time Spent</p>
+        <p id="totalTimeSpent" class="text-xl md:text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1 font-mono">00:00:00</p>
+      </div>
+      
+      <!-- Clickable Completed Tasks Card -->
+      <div 
+        onclick="openCompletedModal()" 
+        class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors cursor-pointer hover:border-emerald-500 dark:hover:border-emerald-500 group"
+      >
+        <div class="flex justify-between items-center">
+          <p class="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">Tasks Completed</p>
+          <span class="text-xs text-gray-400 dark:text-gray-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">Click to view ↗</span>
+        </div>
+        <p id="totalCompletedTasks" class="text-xl md:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 font-mono">0</p>
+      </div>
+    </div>
+
+    <!-- Task List Container -->
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 transition-colors flex-1 flex flex-col min-h-0">
+      <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <div class="flex items-center gap-3">
+          <h2 class="text-base md:text-lg font-semibold text-gray-700 dark:text-gray-200">Task List</h2>
+          <button 
+            onclick="openTaskModal()" 
+            class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg shadow transition flex items-center gap-1"
+          >
+            <span>+</span> Add Task
+          </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Search Box Input -->
+          <div class="relative">
+            <input 
+              type="text" 
+              id="searchInput" 
+              oninput="handleSearch()" 
+              placeholder="Search tasks..." 
+              class="w-36 sm:w-48 px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+
+          <!-- Items Per Page Selector -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">Rows per page:</span>
+            <select 
+              id="pageSizeSelect" 
+              onchange="changePageSize(this.value)" 
+              class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded focus:outline-none"
+            >
+              <option value="10" selected>10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+
+          <button 
+            onclick="clearCompleted()" 
+            class="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 font-medium underline transition"
+          >
+            Clear Finished Tasks
+          </button>
+        </div>
+      </div>
+
+      <!-- Scrollable Task List Inner Box -->
+      <div id="taskList" class="flex-1 overflow-y-auto space-y-3 py-3 pr-1">
+        <p id="emptyMessage" class="text-sm text-gray-400 dark:text-gray-500 text-center py-6">No tasks added yet.</p>
+      </div>
+
+      <!-- Pagination Controls -->
+      <div id="paginationControls" class="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400 shrink-0">
+        <span id="pageRangeInfo">Showing 0-0 of 0</span>
+        
+        <div class="flex items-center gap-2">
+          <button 
+            id="prevPageBtn" 
+            onclick="changePage(-1)" 
+            disabled 
+            class="px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200 rounded transition"
+          >
+            Previous
+          </button>
+          <span id="pageNumberDisplay" class="font-medium">Page 1</span>
+          <button 
+            id="nextPageBtn" 
+            onclick="changePage(1)" 
+            disabled 
+            class="px-3 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200 rounded transition"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Add Task Modal -->
+  <div id="taskModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-white dark:bg-gray-800 max-w-lg w-full p-6 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Add New Activity</h2>
+        <button onclick="closeTaskModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold">✕</button>
+      </div>
+      
+      <!-- Activity Title Input -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Task / Activity Type</label>
+        <input 
+          type="text" 
+          id="taskTitle" 
+          placeholder="e.g., Deep Work, Coding, Reading" 
+          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <!-- Description Input -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Short Description</label>
+        <textarea 
+          id="taskDesc" 
+          rows="2" 
+          placeholder="Brief notes about this session..." 
+          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        ></textarea>
+      </div>
+
+      <!-- Duration Inputs -->
+      <div>
+        <label class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Duration</label>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Hours (0 - 23)</span>
+            <input 
+              type="number" 
+              id="inputHours" 
+              min="0" 
+              value="0" 
+              oninput="validateDurationInputs()"
+              class="w-full mt-1 p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+            />
+            <p id="errorHours" class="text-xs text-red-500 mt-1 hidden">Max 23 hours allowed.</p>
+          </div>
+
+          <div>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Minutes (0 - 59)</span>
+            <input 
+              type="number" 
+              id="inputMinutes" 
+              min="0" 
+              value="0" 
+              oninput="validateDurationInputs()"
+              class="w-full mt-1 p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+            />
+            <p id="errorMinutes" class="text-xs text-red-500 mt-1 hidden">Max 59 mins allowed.</p>
+          </div>
+
+          <div>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Seconds (0 - 59)</span>
+            <input 
+              type="number" 
+              id="inputSeconds" 
+              min="0" 
+              value="0" 
+              oninput="validateDurationInputs()"
+              class="w-full mt-1 p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+            />
+            <p id="errorSeconds" class="text-xs text-red-500 mt-1 hidden">Max 59 secs allowed.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+        <button 
+          onclick="addTask()" 
+          class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition"
+        >
+          Save Task
+        </button>
+        <button 
+          onclick="closeTaskModal()" 
+          class="px-4 py-2.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg transition"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Completed Tasks Modal -->
+  <div id="completedTasksModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-white dark:bg-gray-800 max-w-lg w-full p-6 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 space-y-4">
+      <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100">Completed Tasks</h2>
+        <button onclick="closeCompletedModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl font-bold">✕</button>
+      </div>
+      
+      <div id="completedTasksList" class="max-h-60 overflow-y-auto space-y-2 py-2 pr-1">
+        <!-- Completed tasks list rendered dynamically -->
+      </div>
+
+      <div class="flex justify-end pt-3 border-t border-gray-200 dark:border-gray-700">
+        <button 
+          onclick="closeCompletedModal()" 
+          class="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg transition text-sm"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let tasks = [];
+    let currentPage = 1;
+    let pageSize = 10;
+    let searchQuery = '';
+
+    // --- Dark Mode Logic ---
+    function initTheme() {
+      const savedTheme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const btn = document.getElementById('themeToggleBtn');
+      
+      if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        document.documentElement.classList.add('dark');
+        if (btn) btn.textContent = '☀️';
+      } else {
+        document.documentElement.classList.remove('dark');
+        if (btn) btn.textContent = '🌙';
+      }
+    }
+
+    function toggleDarkMode() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      document.getElementById('themeToggleBtn').textContent = isDark ? '☀️' : '🌙';
+    }
+
+    // --- Search Handling ---
+    function handleSearch() {
+      searchQuery = document.getElementById('searchInput').value.trim().toLowerCase();
+      currentPage = 1;
+      renderTasks();
+    }
+
+    function getFilteredTasks() {
+      if (!searchQuery) return tasks;
+      return tasks.filter(task => 
+        task.title.toLowerCase().includes(searchQuery) || 
+        (task.desc && task.desc.toLowerCase().includes(searchQuery))
+      );
+    }
+
+    // --- Modal Controls ---
+    function openTaskModal() {
+      resetFormInputs();
+      document.getElementById('taskModal').classList.remove('hidden');
+    }
+
+    function closeTaskModal() {
+      document.getElementById('taskModal').classList.add('hidden');
+      resetFormInputs();
+    }
+
+    function openCompletedModal() {
+      const completedList = tasks.filter(t => t.remainingSeconds === 0);
+      const container = document.getElementById('completedTasksList');
+
+      if (completedList.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-400 dark:text-gray-500 text-center py-4">No completed tasks yet.</p>';
+      } else {
+        container.innerHTML = completedList.map(t => `
+          <div class="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600 flex justify-between items-start gap-3">
+            <div class="space-y-1">
+              <h4 class="font-semibold text-sm text-gray-800 dark:text-gray-100">${t.title}</h4>
+              ${t.desc ? `<p class="text-xs text-gray-600 dark:text-gray-300">${t.desc}</p>` : ''}
+            </div>
+            <span class="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap">
+              Duration: ${formatTime(t.initialSeconds)}
+            </span>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('completedTasksModal').classList.remove('hidden');
+    }
+
+    function closeCompletedModal() {
+      document.getElementById('completedTasksModal').classList.add('hidden');
+    }
+
+    function resetFormInputs() {
+      document.getElementById('taskTitle').value = '';
+      document.getElementById('taskDesc').value = '';
+      document.getElementById('inputHours').value = 0;
+      document.getElementById('inputMinutes').value = 0;
+      document.getElementById('inputSeconds').value = 0;
+      validateDurationInputs();
+    }
+
+    function validateDurationInputs() {
+      const hInput = document.getElementById('inputHours');
+      const mInput = document.getElementById('inputMinutes');
+      const sInput = document.getElementById('inputSeconds');
+
+      const errHours = document.getElementById('errorHours');
+      const errMinutes = document.getElementById('errorMinutes');
+      const errSeconds = document.getElementById('errorSeconds');
+
+      const hVal = parseInt(hInput.value) || 0;
+      const mVal = parseInt(mInput.value) || 0;
+      const sVal = parseInt(sInput.value) || 0;
+
+      let isValid = true;
+
+      if (hVal > 23 || hVal < 0) {
+        errHours.classList.remove('hidden');
+        hInput.classList.add('border-red-500', 'focus:ring-red-500');
+        isValid = false;
+      } else {
+        errHours.classList.add('hidden');
+        hInput.classList.remove('border-red-500', 'focus:ring-red-500');
+      }
+
+      if (mVal > 59 || mVal < 0) {
+        errMinutes.classList.remove('hidden');
+        mInput.classList.add('border-red-500', 'focus:ring-red-500');
+        isValid = false;
+      } else {
+        errMinutes.classList.add('hidden');
+        mInput.classList.remove('border-red-500', 'focus:ring-red-500');
+      }
+
+      if (sVal > 59 || sVal < 0) {
+        errSeconds.classList.remove('hidden');
+        sInput.classList.add('border-red-500', 'focus:ring-red-500');
+        isValid = false;
+      } else {
+        errSeconds.classList.add('hidden');
+        sInput.classList.remove('border-red-500', 'focus:ring-red-500');
+      }
+
+      return isValid;
+    }
+
+    function formatTime(totalSeconds) {
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    function playAlarmSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15);
+
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.8);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.8);
+      } catch (e) {
+        console.error("Audio error:", e);
+      }
+    }
+
+    function requestNotificationPermission() {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+
+    function showDesktopNotification(taskTitle) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        const notification = new Notification("Timer Completed! ⏰", {
+          body: `Your activity "${taskTitle}" has finished.`,
+          requireInteraction: true
+        });
+
+        notification.onclick = function() {
+          window.focus();
+          notification.close();
+        };
+      }
+    }
+
+    function updateSummaryStats() {
+      const completedTasks = tasks.filter(t => t.remainingSeconds === 0);
+      const totalSecondsSpent = completedTasks.reduce((sum, task) => sum + task.initialSeconds, 0);
+
+      const summaryDisplay = document.getElementById('totalTimeSpent');
+      const countDisplay = document.getElementById('totalCompletedTasks');
+
+      if (summaryDisplay) summaryDisplay.textContent = formatTime(totalSecondsSpent);
+      if (countDisplay) countDisplay.textContent = completedTasks.length;
+    }
+
+    function saveTasks() {
+      const tasksToSave = tasks.map(task => ({
+        id: task.id,
+        title: task.title,
+        desc: task.desc,
+        initialSeconds: task.initialSeconds,
+        remainingSeconds: task.remainingSeconds,
+        isRunning: task.isRunning,
+        lastUpdated: Date.now()
+      }));
+      localStorage.setItem('productivity_tasks', JSON.stringify(tasksToSave));
+    }
+
+    function loadTasks() {
+      const saved = localStorage.getItem('productivity_tasks');
+      if (!saved) return;
+
+      const parsed = JSON.parse(saved);
+      const now = Date.now();
+
+      tasks = parsed.map(task => {
+        let remaining = task.remainingSeconds;
+
+        if (task.isRunning) {
+          const elapsedSeconds = Math.floor((now - task.lastUpdated) / 1000);
+          remaining = Math.max(0, remaining - elapsedSeconds);
+        }
+
+        return {
+          ...task,
+          remainingSeconds: remaining,
+          isRunning: false,
+          timerId: null
+        };
+      });
+
+      saveTasks();
+      renderTasks();
+    }
+
+    function addTask() {
+      const title = document.getElementById('taskTitle').value.trim();
+      const desc = document.getElementById('taskDesc').value.trim();
+
+      if (!validateDurationInputs()) {
+        alert('Please resolve duration input errors before adding the task.');
+        return;
+      }
+
+      const hours = parseInt(document.getElementById('inputHours').value) || 0;
+      const minutes = parseInt(document.getElementById('inputMinutes').value) || 0;
+      const seconds = parseInt(document.getElementById('inputSeconds').value) || 0;
+
+      if (!title) {
+        alert('Please enter a task/activity type.');
+        return;
+      }
+
+      const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+
+      if (totalSeconds <= 0) {
+        alert('Please set a duration greater than 0 seconds.');
+        return;
+      }
+
+      const newTask = {
+        id: Date.now(),
+        title: title,
+        desc: desc,
+        initialSeconds: totalSeconds,
+        remainingSeconds: totalSeconds,
+        timerId: null,
+        isRunning: false
+      };
+
+      tasks.unshift(newTask);
+      saveTasks();
+      closeTaskModal();
+      currentPage = 1;
+      renderTasks();
+    }
+
+    function startTimer(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || task.isRunning || task.remainingSeconds <= 0) return;
+
+      requestNotificationPermission();
+
+      tasks.forEach(t => {
+        if (t.isRunning && t.id !== taskId) {
+          clearInterval(t.timerId);
+          t.isRunning = false;
+        }
+      });
+
+      task.isRunning = true;
+      saveTasks();
+      renderTasks();
+
+      task.timerId = setInterval(() => {
+        if (task.remainingSeconds > 0) {
+          task.remainingSeconds--;
+          updateDisplay(task);
+          if (task.remainingSeconds % 5 === 0) saveTasks();
+        } else {
+          clearInterval(task.timerId);
+          task.isRunning = false;
+          saveTasks();
+
+          playAlarmSound();
+          showDesktopNotification(task.title);
+
+          setTimeout(() => {
+            alert(`Timer completed for task: "${task.title}"`);
+          }, 100);
+
+          renderTasks();
+        }
+      }, 1000);
+    }
+
+    function stopTimer(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || !task.isRunning) return;
+
+      clearInterval(task.timerId);
+      task.isRunning = false;
+      saveTasks();
+      renderTasks();
+    }
+
+    function resetTimer(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      if (task.isRunning) {
+        clearInterval(task.timerId);
+        task.isRunning = false;
+      }
+
+      task.remainingSeconds = task.initialSeconds;
+      saveTasks();
+      renderTasks();
+    }
+
+    function deleteTask(taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (task && task.timerId) {
+        clearInterval(task.timerId);
+      }
+      tasks = tasks.filter(t => t.id !== taskId);
+      saveTasks();
+      renderTasks();
+    }
+
+    function clearCompleted() {
+      tasks.forEach(t => {
+        if (t.remainingSeconds === 0 && t.timerId) {
+          clearInterval(t.timerId);
+        }
+      });
+      tasks = tasks.filter(t => t.remainingSeconds > 0);
+      saveTasks();
+      renderTasks();
+    }
+
+    function updateDisplay(task) {
+      const timerElement = document.getElementById(`timer-display-${task.id}`);
+      if (timerElement) {
+        timerElement.textContent = formatTime(task.remainingSeconds);
+      }
+    }
+
+    // --- Pagination Logic ---
+    function changePageSize(newSize) {
+      pageSize = parseInt(newSize) || 10;
+      currentPage = 1;
+      renderTasks();
+    }
+
+    function changePage(delta) {
+      const filteredTasks = getFilteredTasks();
+      const totalPages = Math.ceil(filteredTasks.length / pageSize) || 1;
+      currentPage = Math.max(1, Math.min(currentPage + delta, totalPages));
+      renderTasks();
+    }
+
+    function updatePaginationControls(totalFilteredTasks) {
+      const totalPages = Math.ceil(totalFilteredTasks / pageSize) || 1;
+
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const start = totalFilteredTasks === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+      const end = Math.min(currentPage * pageSize, totalFilteredTasks);
+
+      document.getElementById('pageRangeInfo').textContent = `Showing ${start}-${end} of ${totalFilteredTasks}`;
+      document.getElementById('pageNumberDisplay').textContent = `Page ${currentPage} of ${totalPages}`;
+
+      document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+      document.getElementById('nextPageBtn').disabled = currentPage >= totalPages || totalFilteredTasks === 0;
+    }
+
+    function renderTasks() {
+      updateSummaryStats();
+      const filteredTasks = getFilteredTasks();
+      updatePaginationControls(filteredTasks.length);
+
+      const taskList = document.getElementById('taskList');
+      
+      if (tasks.length === 0) {
+        taskList.innerHTML = '<p id="emptyMessage" class="text-sm text-gray-400 dark:text-gray-500 text-center py-6">No tasks added yet.</p>';
+        return;
+      }
+
+      if (filteredTasks.length === 0) {
+        taskList.innerHTML = '<p id="emptyMessage" class="text-sm text-gray-400 dark:text-gray-500 text-center py-6">No matching tasks found.</p>';
+        return;
+      }
+
+      const startIndex = (currentPage - 1) * pageSize;
+      const pageTasks = filteredTasks.slice(startIndex, startIndex + pageSize);
+
+      const activeTask = tasks.find(t => t.isRunning);
+
+      taskList.innerHTML = pageTasks.map(task => {
+        const isAnotherRunning = activeTask && activeTask.id !== task.id;
+        const isStartDisabled = task.isRunning || task.remainingSeconds === 0 || isAnotherRunning;
+
+        let startTitle = '';
+        if (task.remainingSeconds === 0) {
+          startTitle = 'Timer completed. Reset to start again.';
+        } else if (isAnotherRunning) {
+          startTitle = `Another task ("${activeTask.title}") is currently in progress.`;
+        }
+
+        return `
+          <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 md:p-4 bg-gray-50 dark:bg-gray-700/50 flex flex-col md:flex-row md:items-center justify-between gap-3 transition-colors">
+            <div class="space-y-1 max-w-md">
+              <h3 class="font-semibold text-gray-800 dark:text-gray-100 text-sm md:text-base">${task.title}</h3>
+              ${task.desc ? `<p class="text-xs md:text-sm text-gray-600 dark:text-gray-300 break-words">${task.desc}</p>` : ''}
+            </div>
+            
+            <div class="flex items-center gap-4 self-end md:self-center">
+              <div class="font-mono text-lg md:text-xl font-bold ${task.remainingSeconds === 0 ? 'text-red-500 dark:text-red-400' : 'text-indigo-600 dark:text-indigo-400'}">
+                <span id="timer-display-${task.id}">${formatTime(task.remainingSeconds)}</span>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button 
+                  onclick="startTimer(${task.id})" 
+                  ${isStartDisabled ? 'disabled' : ''}
+                  title="${startTitle}"
+                  class="px-2.5 py-1 md:px-3 md:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Start
+                </button>
+                
+                <button 
+                  onclick="stopTimer(${task.id})" 
+                  ${!task.isRunning ? 'disabled' : ''}
+                  class="px-2.5 py-1 md:px-3 md:py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs md:text-sm font-medium rounded disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Stop
+                </button>
+
+                <button 
+                  onclick="resetTimer(${task.id})" 
+                  class="px-2.5 py-1 md:px-3 md:py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-xs md:text-sm font-medium rounded transition"
+                >
+                  Reset
+                </button>
+
+                <button 
+                  onclick="deleteTask(${task.id})" 
+                  class="px-2.5 py-1 md:px-3 md:py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs md:text-sm font-medium rounded transition"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Initialize Theme and Load Tasks
+    initTheme();
+    loadTasks();
+  </script>
+</body>
+</html>
